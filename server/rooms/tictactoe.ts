@@ -1,5 +1,9 @@
 import { Room, Delayed, Client } from 'colyseus';
 import { type, Schema, MapSchema, ArraySchema } from '@colyseus/schema';
+import FaceitMatch from "./faceitmatch";
+
+// ---------- FACEIT import ----------
+import { sendMatchReady, sendMatchStarted, sendMatchFinished } from "nodejs-server-plugin";
 
 const TURN_TIMEOUT = 10
 const BOARD_WIDTH = 3;
@@ -19,10 +23,20 @@ export class TicTacToe extends Room<State> {
   onCreate () {
     this.setState(new State());
     this.onMessage("action", (client, message) => this.playerAction(client, message));
+
+    // ---------- FACEIT Match Ready ----------
+    if (faceitMatch.getMatchId() !== "") {
+      sendMatchReady(faceitMatch.getMatchId(), {});
+    }
   }
 
   onJoin (client: Client) {
-    this.state.players[client.sessionId] = client.sessionId;
+    // bind faceit player ids to session ids
+    if (Object.keys(this.state.players).length > 0) {
+      this.state.players[client.sessionId] = faceitMatch.getPlayer2();
+    } else {
+      this.state.players[client.sessionId] = faceitMatch.getPlayer1();
+    }
 
     if (Object.keys(this.state.players).length === 2) {
       this.state.currentTurn = client.sessionId;
@@ -30,6 +44,11 @@ export class TicTacToe extends Room<State> {
 
       // lock this room for new users
       this.lock();
+
+      // ---------- FACEIT Match Started ----------
+      if (faceitMatch.getMatchId() !== "") {
+        sendMatchStarted(faceitMatch.getMatchId(), {});
+      }
     }
   }
 
@@ -50,9 +69,32 @@ export class TicTacToe extends Room<State> {
         if (this.checkWin(data.x, data.y, move)) {
           this.state.winner = client.sessionId;
 
+          // ---------- FACEIT Match Finished ----------
+          if (faceitMatch.getMatchId() !== "") {
+            const winnerId = this.state.players[this.state.winner];
+            const faction1Score = winnerId === faceitMatch.getPlayer1() ? 1 : 0;
+            const faction2Score = winnerId === faceitMatch.getPlayer2() ? 1 : 0;
+            const payload = {
+              "score": {
+                "faction1": faction1Score,
+                "faction2": faction2Score
+              }
+            }
+            sendMatchFinished(faceitMatch.getMatchId(), payload);
+          }
         } else if (this.checkBoardComplete()) {
           this.state.draw = true;
 
+          // ---------- FACEIT Match Finished ----------
+          if (faceitMatch.getMatchId() !== "") {
+            const payload = {
+              "score": {
+                "faction1": 1, // draws not supported
+                "faction2": 0
+              }
+            }
+            sendMatchFinished(faceitMatch.getMatchId(), payload);
+          }
         } else {
           // switch turn
           const otherPlayerSessionId = (client.sessionId === playerIds[0]) ? playerIds[1] : playerIds[0];
@@ -145,10 +187,41 @@ export class TicTacToe extends Room<State> {
     if (this.randomMoveTimeout) this.randomMoveTimeout.clear()
 
     let remainingPlayerIds = Object.keys(this.state.players)
-    if (remainingPlayerIds.length > 0) {
+    if (remainingPlayerIds.length > 0 && !Boolean(this.state.winner)) {
       this.state.winner = remainingPlayerIds[0]
+
+      // ---------- FACEIT Match Finished ----------
+      const winnerId = this.state.players[this.state.winner];
+      const faction1Score = winnerId === faceitMatch.getPlayer1() ? 1 : 0;
+      const faction2Score = winnerId === faceitMatch.getPlayer2() ? 1 : 0;
+      const payload = {
+        "score": {
+          "faction1": faction1Score,
+          "faction2": faction2Score
+        }
+      }
+      sendMatchFinished(faceitMatch.getMatchId(), payload);
     }
+
   }
 
 }
 
+// FACEIT Match
+const faceitMatch = new FaceitMatch();
+
+export function getFaceitMatch(): FaceitMatch {
+  return faceitMatch;
+}
+
+export function createFaceitMatch(matchId: string, fp1: string, fp2: string) {
+  faceitMatch.setMatchId(matchId);
+  faceitMatch.setPlayer1(fp1);
+  faceitMatch.setPlayer2(fp2);
+}
+
+export function cancelFaceitMatch() {
+  faceitMatch.setMatchId("");
+  faceitMatch.setPlayer1("");
+  faceitMatch.setPlayer2("");
+}

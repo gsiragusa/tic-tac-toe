@@ -1,7 +1,7 @@
 local ColyseusClient = require "colyseus.client"
 
 -- SERVER VARS
-local server_adress = "localhost"
+local server_address = "localhost"
 local server_port = "3553"
 
 --VARS
@@ -41,7 +41,7 @@ end
 
 function init(self)
 	-- Connect to WS
-	client = ColyseusClient.new("ws://" .. server_adress .. ":" .. server_port, false) -- false: not to connect immediately
+	client = ColyseusClient.new("ws://" .. server_address .. ":" .. server_port, false) -- false: not to connect immediately
 
 	-- EVENTS
 	-- Join Room
@@ -53,7 +53,7 @@ function init(self)
 			return
 		end
 
-		-- assign our roomm instance to global "room" variable
+		-- assign our room instance to global "room" variable
 		room = room_instance
 
 		--Listen to room state changes from the room handler.
@@ -90,7 +90,7 @@ function init(self)
 		end
 
 		room:on("error", function(err)
-			print("oops, error ocurred:")
+			print("oops, error occurred:")
 			print(err)
 		end)
 	end);
