@@ -8,6 +8,7 @@
   },
   "author": "Endel Dreyer",
   "dependencies": {
+    "@faceit/nodejs-server-plugin": "^1.0.0",
     "css-loader": "^0.28.11",
     "json-loader": "^0.5.7",
     "nodejs-server-plugin": "^1.0.0",
